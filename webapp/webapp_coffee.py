@@ -270,7 +270,7 @@ def craft_error_template(status, response):
         )
     elif status == 406:
         return render_template(
-            ERROR_TEMPLATE, title="Not Acceptable", error=status
+            ERROR_TEMPLATE, title="Not Acceptable, don't add weird things to your coffee.", error=status
         )
     elif status != 200:
         return render_template(

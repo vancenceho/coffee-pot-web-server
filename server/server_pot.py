@@ -131,6 +131,7 @@ def main(argv):
                         f.write("{}")
 
             url = message.split(" ")[1]
+
             headers = message.split("\r\n")
 
             content_type = [
@@ -181,7 +182,13 @@ def main(argv):
                     )
 
                     ## TODO: Create response headers 
-                    headers_to_send = []
+                    headers_to_send = [
+                        "HTCPCP/1.1 200 OK \r\n",
+                        "Server: CoffeePot \r\n",
+                        "Content-Type: message/coffee-pot-command \r\n",
+                        "Date: " + current_date + "\r\n",
+                        "\r\n",
+                    ]
 
                     response = create_request_response(
                         method, message, additions, pour_milk_start
@@ -195,7 +202,18 @@ def main(argv):
                     # TODO: Handle other cases that passes ensure_request_is_valid but isn't supported
                     # if we reach here, request is valid, but the server doesn't support this feature 
                     # e.g: 406
-                    final_response = ""
+
+                    accepted_addtions = list(ACCEPTED_ADDITIONS.keys())
+                    headers_to_send = [ 
+                        "HTCPCP/1.1 406 Not Acceptable \r\n", 
+                        "Server: CoffeePot \r\n",
+                        "Content-Type: message/coffee-pot-command \r\n",
+                        "Date: " + current_date + "\r\n",
+                        "Accept-Additions: " + ";".join(accepted_addtions),
+                        "\r\n", 
+                    ]
+
+                    final_response = "".join(headers_to_send)
                     
 
                 connection.send(bytes(final_response.encode("utf-8")))
@@ -227,6 +245,29 @@ def ensure_request_is_valid(url, content_type, method, connection, requested_pot
 
     If all checks pass, return True
     """
+
+    # 1. Validate the scheme against accepted_coffee_schemes
+    scheme = url.split(":")[0]
+    if scheme not in accepted_coffee_schemes:
+        return send_error(connection, b"HTCPCP/1.1 400 Bad Request\r\n\r\n Scheme Not Allowed\r\n")
+    
+    # 2. Check for correct URL path format
+    # Assuming the URL path is "coffee://ducky"
+    if url != "coffee://ducky":
+        return send_error(connection, not_found_message)
+    
+    # 3. Validate the HTTP method: check method against accepted_methods
+    if method not in accepted_methods:
+        return send_error(connection, b"HTCPCP/1.1 501\r\n\r\n Method Not Allowed\r\n\r\n")
+    
+    # 4. Check the content type format to conform to "application/coffee-pot-command"
+    if len(content_type) > 0 and content_type[0] != "Content-Type: application/coffee-pot-command":
+        return send_error(connection, b"HTCPCP/1.1 415\r\n\r\n Unsupported Content Type\r\n\r\n")
+    
+    # 5. Specific check for "tea" pot request
+    if requested_pot == "tea":
+        return send_error(connection, b"HTCPCP/1.1 418\r\n\r\n I'm a coffee pot, not a tea pot\r\n\r\n")
+    
     return True
 
 def process_additions(headers, processing_request, connection):
